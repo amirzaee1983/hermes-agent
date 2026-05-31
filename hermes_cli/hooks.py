@@ -157,6 +157,10 @@ _DEFAULT_PAYLOADS = {
         "approx_input_tokens": 2048,
         "request_char_count": 8192,
         "max_tokens": 4096,
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Hello"},
+        ],
     },
     "post_api_request": {
         "session_id": "test-session",
@@ -174,6 +178,7 @@ _DEFAULT_PAYLOADS = {
         "usage": {"input_tokens": 2048, "output_tokens": 512},
         "assistant_content_chars": 1200,
         "assistant_tool_call_count": 0,
+        "assistant_message": None,
     },
     "subagent_stop": {
         "parent_session_id": "parent-sess",

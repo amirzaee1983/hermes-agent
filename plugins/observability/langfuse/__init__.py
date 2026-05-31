@@ -17,7 +17,7 @@ Optional env vars:
   HERMES_LANGFUSE_ENV         - environment tag (e.g. "production", "local")
   HERMES_LANGFUSE_RELEASE     - release/version tag
   HERMES_LANGFUSE_SAMPLE_RATE - sampling rate 0.0–1.0 (default: 1.0)
-  HERMES_LANGFUSE_MAX_CHARS   - max chars per field (default: 12000)
+  HERMES_LANGFUSE_MAX_CHARS   - max chars per field (default: 200000)
   HERMES_LANGFUSE_DEBUG       - set to "true" for verbose logging
 """
 from __future__ import annotations
@@ -285,7 +285,7 @@ def _normalize_payload(value: Any, *, tool_name: str = "", args: Any = None) -> 
 
 def _safe_value(value: Any, *, max_chars: Optional[int] = None, depth: int = 0,
                 parse_json_strings: bool = False) -> Any:
-    max_chars = max_chars if max_chars is not None else int(_env("HERMES_LANGFUSE_MAX_CHARS", "12000") or "12000")
+    max_chars = max_chars if max_chars is not None else int(_env("HERMES_LANGFUSE_MAX_CHARS", "200000") or "200000")
     if depth > 4:
         return "<max-depth>"
     if value is None or isinstance(value, (int, float, bool)):
@@ -331,8 +331,21 @@ def _extract_last_user_message(messages: Any) -> Any:
 def _serialize_messages(messages: Any) -> list[dict[str, Any]]:
     if not isinstance(messages, list):
         return []
+
+    # Split system messages from conversation messages so the system prompt
+    # is always captured verbatim, regardless of conversation length.
+    system_msgs = [m for m in messages if isinstance(m, dict) and m.get("role") == "system"]
+    non_system_msgs = [m for m in messages if not (isinstance(m, dict) and m.get("role") == "system")]
+
     serialized = []
-    for message in messages[-12:]:
+
+    for message in system_msgs:
+        serialized.append({
+            "role": "system",
+            "content": _safe_value(message.get("content")),
+        })
+
+    for message in non_system_msgs[-12:]:
         if not isinstance(message, dict):
             continue
         role = message.get("role")
@@ -348,6 +361,7 @@ def _serialize_messages(messages: Any) -> list[dict[str, Any]]:
         if message.get("tool_calls"):
             item["tool_calls"] = _safe_value(message.get("tool_calls"), parse_json_strings=True)
         serialized.append(item)
+
     return serialized
 
 
@@ -373,11 +387,17 @@ def _serialize_tool_calls(tool_calls: Any) -> list[dict[str, Any]]:
 
 
 def _serialize_assistant_message(message: Any) -> dict[str, Any]:
-    return {
+    result: dict[str, Any] = {
         "content": _safe_value(getattr(message, "content", None)),
         "reasoning": _safe_value(getattr(message, "reasoning", None)),
         "tool_calls": _serialize_tool_calls(getattr(message, "tool_calls", None)),
     }
+    # Capture Anthropic extended-thinking blocks (reasoning_details) when present.
+    # These contain thinking text + signatures — required for Q6 (reasoning capture).
+    reasoning_details = getattr(message, "reasoning_details", None)
+    if reasoning_details:
+        result["reasoning_details"] = _safe_value(reasoning_details)
+    return result
 
 
 def _usage_and_cost(response: Any, *, provider: str, api_mode: str, model: str, base_url: str) -> tuple[dict[str, int], dict[str, float]]:
