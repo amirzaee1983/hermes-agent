@@ -1369,6 +1369,8 @@ class MoaPresetPayload(BaseModel):
     # single-model agent behavior.
     reference_temperature: Optional[float] = None
     aggregator_temperature: Optional[float] = None
+    reference_timeout: float = 30.0
+    degraded_reference_policy: str = "loud"
     max_tokens: int = 4096
     # Newer per-preset knobs (see moa_config._normalize_preset). Optional so
     # older clients that never send them keep working; declared so clients
@@ -1388,6 +1390,8 @@ class MoaConfigPayload(BaseModel):
     aggregator: MoaModelSlot = MoaModelSlot()
     reference_temperature: Optional[float] = None
     aggregator_temperature: Optional[float] = None
+    reference_timeout: float = 30.0
+    degraded_reference_policy: str = "loud"
     max_tokens: int = 4096
     reference_max_tokens: Optional[int] = None
     fanout: Optional[str] = None
@@ -6783,6 +6787,8 @@ def set_moa_models(body: MoaConfigPayload, profile: Optional[str] = None):
                 "aggregator": _slot_dict(preset.aggregator),
                 "reference_temperature": preset.reference_temperature,
                 "aggregator_temperature": preset.aggregator_temperature,
+                "reference_timeout": preset.reference_timeout,
+                "degraded_reference_policy": preset.degraded_reference_policy,
                 "max_tokens": preset.max_tokens,
                 "reference_max_tokens": preset.reference_max_tokens,
                 "fanout": preset.fanout,
@@ -6804,6 +6810,8 @@ def set_moa_models(body: MoaConfigPayload, profile: Optional[str] = None):
                         aggregator=body.aggregator,
                         reference_temperature=body.reference_temperature,
                         aggregator_temperature=body.aggregator_temperature,
+                        reference_timeout=body.reference_timeout,
+                        degraded_reference_policy=body.degraded_reference_policy,
                         max_tokens=body.max_tokens,
                         reference_max_tokens=body.reference_max_tokens,
                         fanout=body.fanout,
@@ -6823,7 +6831,6 @@ def set_moa_models(body: MoaConfigPayload, profile: Optional[str] = None):
                     status_code=422,
                     detail="Invalid MoA config: " + "; ".join(problems),
                 )
-
             normalized = normalize_moa_config(raw)
             cfg["moa"] = normalized
             save_config(cfg)
