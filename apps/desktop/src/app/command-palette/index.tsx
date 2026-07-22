@@ -76,7 +76,8 @@ import {
   sessionRoute,
   SETTINGS_ROUTE,
   SKILLS_ROUTE,
-  STARMAP_ROUTE
+  STARMAP_ROUTE,
+  WEBHOOKS_ROUTE
 } from '../routes'
 import { FIELD_LABELS, SECTIONS } from '../settings/constants'
 import { fieldCopyForSchemaKey } from '../settings/field-copy'
@@ -456,6 +457,14 @@ export function CommandPalette() {
             id: 'nav-messaging',
             label: cc.nav.messaging.title,
             run: go(MESSAGING_ROUTE)
+          },
+          {
+            action: 'nav.webhooks',
+            icon: Globe,
+            id: 'nav-webhooks',
+            keywords: ['webhook', 'http', 'events', 'github', 'trigger'],
+            label: cc.nav.webhooks.title,
+            run: go(WEBHOOKS_ROUTE)
           },
           {
             action: 'nav.artifacts',

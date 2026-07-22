@@ -53,7 +53,8 @@ import {
   PROFILES_ROUTE,
   sessionRoute,
   SETTINGS_ROUTE,
-  SKILLS_ROUTE
+  SKILLS_ROUTE,
+  WEBHOOKS_ROUTE
 } from '../routes'
 
 export interface KeybindRuntimeDeps {
@@ -133,6 +134,7 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     'nav.profiles': () => navigate(PROFILES_ROUTE),
     'nav.skills': () => navigate(SKILLS_ROUTE),
     'nav.messaging': () => navigate(MESSAGING_ROUTE),
+    'nav.webhooks': () => navigate(WEBHOOKS_ROUTE),
     'nav.artifacts': () => navigate(ARTIFACTS_ROUTE),
     'nav.cron': () => navigate(CRON_ROUTE),
     'nav.agents': () => navigate(AGENTS_ROUTE),

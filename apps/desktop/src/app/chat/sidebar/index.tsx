@@ -104,7 +104,8 @@ import {
   MESSAGING_ROUTE,
   SIDEBAR_NAV_AREA,
   type SidebarNavContribution,
-  SKILLS_ROUTE
+  SKILLS_ROUTE,
+  WEBHOOKS_ROUTE
 } from '../../routes'
 import type { SidebarNavItem } from '../../types'
 
@@ -160,6 +161,13 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
     icon: props => <Codicon name="comment" {...props} />,
     route: MESSAGING_ROUTE,
     keybindActionId: 'nav.messaging'
+  },
+  {
+    id: 'webhooks',
+    label: '',
+    icon: props => <Codicon name="radio-tower" {...props} />,
+    route: WEBHOOKS_ROUTE,
+    keybindActionId: 'nav.webhooks'
   },
   {
     id: 'artifacts',
