@@ -7,6 +7,8 @@ import type {
   AudioSpeakResponse,
   AudioTranscriptionResponse,
   AuxiliaryModelsResponse,
+  AutomationBlueprint,
+  AutomationBlueprintField,
   BackendUpdateCheckResponse,
   ComputerUseStatus,
   ConfigSchemaResponse,
@@ -127,6 +129,8 @@ export type {
   AudioSpeakResponse,
   AudioTranscriptionResponse,
   AuxiliaryModelsResponse,
+  AutomationBlueprint,
+  AutomationBlueprintField,
   BackendUpdateCheckResponse,
   ComputerUseCheck,
   ComputerUsePermissionSource,
@@ -1187,6 +1191,32 @@ export function deleteCronJob(jobId: string): Promise<{ ok: boolean }> {
     ...profileScoped(),
     path: `/api/cron/jobs/${encodeURIComponent(jobId)}`,
     method: 'DELETE'
+  })
+}
+
+// Automation Blueprints — parameterized cron templates the backend serves from
+// cron/blueprint_catalog.py. getAutomationBlueprints returns the gallery
+// (deliver options already rewritten to this machine's configured gateways);
+// instantiateAutomationBlueprint fills the slots and creates a real cron job via
+// the same create_job path as createCronJob. Both are profile-scoped like the
+// sibling cron endpoints.
+export function getAutomationBlueprints(): Promise<{ blueprints: AutomationBlueprint[] }> {
+  return window.hermesDesktop.api<{ blueprints: AutomationBlueprint[] }>({
+    ...profileScoped(),
+    path: '/api/cron/blueprints',
+    timeoutMs: STARTUP_REQUEST_TIMEOUT_MS
+  })
+}
+
+export function instantiateAutomationBlueprint(
+  body: { blueprint: string; values: Record<string, string> },
+  profile: string
+): Promise<CronJob> {
+  return window.hermesDesktop.api<CronJob>({
+    ...profileScoped(),
+    path: `/api/cron/blueprints/instantiate?profile=${encodeURIComponent(profile)}`,
+    method: 'POST',
+    body
   })
 }
 

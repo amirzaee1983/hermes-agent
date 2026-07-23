@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
-import { Codicon } from '@/components/ui/codicon'
+import { Codicon, codiconIcon } from '@/components/ui/codicon'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import {
   Dialog,
   DialogContent,
@@ -63,12 +64,19 @@ import {
   PanelRowMenu,
   PanelSectionLabel
 } from '../overlays/panel'
+
+import { BlueprintsPanel } from './blueprints'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
 import { cronEditorUpdates, jobIsScriptOnly, validateCronEditor } from './cron-job-model'
 import { jobState, jobTitle, STATE_DOT } from './job-state'
 
 const DEFAULT_DELIVER = 'local'
+
+// Two surfaces share the cron panel: the live Jobs list and the Blueprints
+// gallery (parameterized templates that instantiate a real job). The active tab
+// is pure view state — it lives here, not in a store.
+type CronTab = 'blueprints' | 'jobs'
 
 // Radix <SelectItem> rejects empty-string values, so the "no override" row in
 // the model picker carries this sentinel and is mapped back to '' on save.
@@ -290,6 +298,7 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   const pendingScrollRef = useRef<null | string>(null)
   const focusJobId = useStore($cronFocusJobId)
 
+  const [tab, setTab] = useState<CronTab>('jobs')
   const [editor, setEditor] = useState<EditorState>({ mode: 'closed' })
   const [pendingDelete, setPendingDelete] = useState<CronJob | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -437,9 +446,26 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
     setEditor({ mode: 'closed' })
   }
 
+  const tabToggle = (
+    <SegmentedControl
+      onChange={setTab}
+      options={[
+        { icon: codiconIcon('watch'), id: 'jobs', label: c.tabs.jobs },
+        { icon: codiconIcon('lightbulb'), id: 'blueprints', label: c.blueprints.tab }
+      ]}
+      value={tab}
+    />
+  )
+
   return (
     <Panel closeLabel={c.close} onClose={onClose}>
-      {loading && jobs.length === 0 ? (
+      <PanelHeader actions={tabToggle} subtitle={tab === 'jobs' ? c.count(totalCount) : c.blueprints.subtitle} title={c.title} />
+
+      {tab === 'blueprints' ? (
+        <PanelBody>
+          <BlueprintsPanel profile={profileScope === ALL_PROFILES ? 'default' : profileScope} />
+        </PanelBody>
+      ) : loading && jobs.length === 0 ? (
         <PageLoader label={c.loading} />
       ) : totalCount === 0 ? (
         <PanelEmpty
@@ -453,56 +479,53 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
           title={c.emptyTitleNew}
         />
       ) : (
-        <>
-          <PanelHeader subtitle={c.count(totalCount)} title={c.title} />
-          <PanelBody>
-            <PanelList
-              onSearchChange={setQuery}
-              searchHints={jobs
-                .map(jobTitle)
-                .filter(Boolean)
-                .slice(0, 5)
-                .map(title => t.common.tryHint(title))}
-              searchLabel={c.search}
-              searchPlaceholder={c.search}
-              searchValue={query}
-            >
-              {visibleJobs.map(job => (
-                <CronJobListRow
-                  active={selectedJob?.id === job.id}
-                  job={job}
-                  key={job.id}
-                  menu={
-                    <PanelRowMenu
-                      items={[
-                        { icon: 'edit', label: c.edit, onSelect: () => setEditor({ mode: 'edit', job }) },
-                        { icon: 'trash', label: t.common.delete, onSelect: () => setPendingDelete(job), tone: 'danger' }
-                      ]}
-                    />
-                  }
-                  onSelect={() => setSelectedJobId(job.id)}
-                />
-              ))}
-              {visibleJobs.length === 0 && (
-                <p className="px-2 py-4 text-center text-xs text-muted-foreground">{c.emptyTitleSearch}</p>
-              )}
-              <PanelAddButton label={c.newCron} onClick={() => setEditor({ mode: 'create' })} />
-            </PanelList>
-
-            {selectedJob ? (
-              <CronJobDetail
-                busy={busyJobId === selectedJob.id}
-                c={c}
-                job={selectedJob}
-                onOpenSession={onOpenSession}
-                onPauseResume={() => void handlePauseResume(selectedJob)}
-                onTrigger={() => void handleTrigger(selectedJob)}
+        <PanelBody>
+          <PanelList
+            onSearchChange={setQuery}
+            searchHints={jobs
+              .map(jobTitle)
+              .filter(Boolean)
+              .slice(0, 5)
+              .map(title => t.common.tryHint(title))}
+            searchLabel={c.search}
+            searchPlaceholder={c.search}
+            searchValue={query}
+          >
+            {visibleJobs.map(job => (
+              <CronJobListRow
+                active={selectedJob?.id === job.id}
+                job={job}
+                key={job.id}
+                menu={
+                  <PanelRowMenu
+                    items={[
+                      { icon: 'edit', label: c.edit, onSelect: () => setEditor({ mode: 'edit', job }) },
+                      { icon: 'trash', label: t.common.delete, onSelect: () => setPendingDelete(job), tone: 'danger' }
+                    ]}
+                  />
+                }
+                onSelect={() => setSelectedJobId(job.id)}
               />
-            ) : (
-              <PanelEmpty description={c.emptyDescSearch} icon="search" />
+            ))}
+            {visibleJobs.length === 0 && (
+              <p className="px-2 py-4 text-center text-xs text-muted-foreground">{c.emptyTitleSearch}</p>
             )}
-          </PanelBody>
-        </>
+            <PanelAddButton label={c.newCron} onClick={() => setEditor({ mode: 'create' })} />
+          </PanelList>
+
+          {selectedJob ? (
+            <CronJobDetail
+              busy={busyJobId === selectedJob.id}
+              c={c}
+              job={selectedJob}
+              onOpenSession={onOpenSession}
+              onPauseResume={() => void handlePauseResume(selectedJob)}
+              onTrigger={() => void handleTrigger(selectedJob)}
+            />
+          ) : (
+            <PanelEmpty description={c.emptyDescSearch} icon="search" />
+          )}
+        </PanelBody>
       )}
 
       <CronEditorDialog editor={editor} onClose={() => setEditor({ mode: 'closed' })} onSave={handleEditorSave} />

@@ -1531,7 +1531,24 @@ export const ja = defineLocale({
     scheduleRequired: 'スケジュールは必須です。',
     scriptOnlyEditHint: 'スクリプトのみのジョブ（AI プロンプトなし）。ジョブ ID:',
     saveChanges: '変更を保存',
-    createAction: 'Cron を作成'
+    createAction: 'Cron を作成',
+    tabs: {
+      jobs: 'ジョブ',
+      blueprints: 'ブレーンプリント'
+    },
+    blueprints: {
+      tab: 'ブレーンプリント',
+      subtitle: 'すぐに使える自動化',
+      setUp: '設定',
+      cancel: 'キャンセル',
+      scheduleIt: 'スケジュールする',
+      scheduling: 'スケジュール中...',
+      scheduled: 'ブレーンプリントをスケジュールしました',
+      loading: 'ブレーンプリントを読み込み中...',
+      failedLoad: 'ブレーンプリントの読み込みに失敗しました',
+      emptyTitle: '利用できるブレーンプリントはありません',
+      emptyDesc: 'このバックエンドで利用できる自動化ブレーンプリントはありません。'
+    }
   },
 
   artifacts: {

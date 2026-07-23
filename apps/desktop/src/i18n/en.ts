@@ -1592,7 +1592,24 @@ export const en: Translations = {
     scheduleRequired: 'Schedule is required.',
     scriptOnlyEditHint: 'Script-only job (no AI prompt). Job id:',
     saveChanges: 'Save changes',
-    createAction: 'Create cron'
+    createAction: 'Create cron',
+    tabs: {
+      jobs: 'Jobs',
+      blueprints: 'Blueprints'
+    },
+    blueprints: {
+      tab: 'Blueprints',
+      subtitle: 'Ready-made automations',
+      setUp: 'Set up',
+      cancel: 'Cancel',
+      scheduleIt: 'Schedule it',
+      scheduling: 'Scheduling...',
+      scheduled: 'Blueprint scheduled',
+      loading: 'Loading blueprints...',
+      failedLoad: 'Failed to load blueprints',
+      emptyTitle: 'No blueprints available',
+      emptyDesc: 'No automation blueprints are available on this backend.'
+    }
   },
 
   artifacts: {

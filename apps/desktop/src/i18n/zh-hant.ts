@@ -1480,7 +1480,24 @@ export const zhHant = defineLocale({
     scheduleRequired: '排程為必填項目。',
     scriptOnlyEditHint: '僅腳本任務（無 AI 提示詞）。任務 ID：',
     saveChanges: '儲存變更',
-    createAction: '建立排程工作'
+    createAction: '建立排程工作',
+    tabs: {
+      jobs: '工作',
+      blueprints: '藍圖'
+    },
+    blueprints: {
+      tab: '藍圖',
+      subtitle: '現成的自動化',
+      setUp: '設定',
+      cancel: '取消',
+      scheduleIt: '安排工作',
+      scheduling: '安排中...',
+      scheduled: '藍圖已安排',
+      loading: '正在載入藍圖...',
+      failedLoad: '載入藍圖失敗',
+      emptyTitle: '沒有可用的藍圖',
+      emptyDesc: '此後端上沒有可用的自動化藍圖。'
+    }
   },
 
   artifacts: {
