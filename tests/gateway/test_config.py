@@ -2472,10 +2472,15 @@ class TestApiServerEnvOverride:
             },
         )
 
-        with patch.dict(os.environ, {"API_SERVER_KEY": "secret-key"}, clear=True):
+        # 16+ chars: since the load-time strength gate (has_usable_secret,
+        # min_length=16) the api_server env branch only runs for keys the
+        # adapter would actually accept — a shorter key skips the branch
+        # entirely and this test would assert nothing.
+        strong_key = "secret-key-0123456789"
+        with patch.dict(os.environ, {"API_SERVER_KEY": strong_key}, clear=True):
             _apply_env_overrides(config)
 
         # Explicit disable wins over the env-var presence.
         assert config.platforms[Platform.API_SERVER].enabled is False
         # The key is still wired through for the shared listener.
-        assert config.platforms[Platform.API_SERVER].extra.get("key") == "secret-key"
+        assert config.platforms[Platform.API_SERVER].extra.get("key") == strong_key
