@@ -1302,6 +1302,7 @@ def _run_single_child(
     goal: str,
     child=None,
     parent_agent=None,
+    child_timeout_seconds: Optional[float] = None,
     **_kwargs,
 ) -> Dict[str, Any]:
     """
@@ -1467,7 +1468,11 @@ def _run_single_child(
 
         # Run child with a hard timeout to prevent indefinite blocking
         # when the child's API call or tool-level HTTP request hangs.
-        child_timeout = _get_child_timeout()
+        # Per-call override takes priority; falls back to config default.
+        if child_timeout_seconds is not None:
+            child_timeout = max(30.0, float(child_timeout_seconds))
+        else:
+            child_timeout = _get_child_timeout()
         _timeout_executor = ThreadPoolExecutor(
             max_workers=1,
             # Install a non-interactive approval callback in the worker thread
@@ -1899,19 +1904,29 @@ def delegate_task(
     acp_command: Optional[str] = None,
     acp_args: Optional[List[str]] = None,
     role: Optional[str] = None,
+    model: Optional[str] = None,
+    child_timeout_seconds: Optional[float] = None,
     parent_agent=None,
 ) -> str:
     """
     Spawn one or more child agents to handle delegated tasks.
 
     Supports two modes:
-      - Single: provide goal (+ optional context, toolsets, role)
-      - Batch:  provide tasks array [{goal, context, toolsets, role}, ...]
+      - Single: provide goal (+ optional context, toolsets, role, model)
+      - Batch:  provide tasks array [{goal, context, toolsets, role, model}, ...]
 
     The 'role' parameter controls whether a child can further delegate:
     'leaf' (default) cannot; 'orchestrator' retains the delegation
     toolset and can spawn its own workers, bounded by
     delegation.max_spawn_depth.  Per-task role beats the top-level one.
+
+    The 'model' parameter sets the child's model (e.g. a role matrix like
+    orchestrator='qwen-3.7-max', coder='kimi-k3').  Per-task model beats the
+    top-level one, which beats delegation.model from config, which falls back
+    to inheriting the parent's model.  The child rides the resolved delegation
+    provider (or, when unset, the parent's) — so a per-task model must be
+    served by that same endpoint (e.g. any model routed through the LiteLLM
+    proxy).  Cross-provider per-task routing still requires delegation.provider.
 
     Returns JSON with results array, one entry per task.
     """
@@ -1992,7 +2007,13 @@ def delegate_task(
         task_list = tasks
     elif goal and isinstance(goal, str) and goal.strip():
         task_list = [
-            {"goal": goal, "context": context, "toolsets": toolsets, "role": top_role}
+            {
+                "goal": goal,
+                "context": context,
+                "toolsets": toolsets,
+                "role": top_role,
+                "model": model,
+            }
         ]
     else:
         return tool_error("Provide either 'goal' (single task) or 'tasks' (batch).")
@@ -2033,12 +2054,18 @@ def delegate_task(
             # Per-task role beats top-level; normalise again so unknown
             # per-task values warn and degrade to leaf uniformly.
             effective_role = _normalize_role(t.get("role") or top_role)
+            # Per-task model beats top-level, which beats delegation.model
+            # from config (creds["model"]); None falls through to the parent's
+            # model inside _build_child_agent. Rides the resolved delegation
+            # provider (or parent's when unset), so the model must be served
+            # by that same endpoint (e.g. any LiteLLM-proxy route).
+            effective_model = t.get("model") or model or creds["model"]
             child = _build_child_agent(
                 task_index=i,
                 goal=t["goal"],
                 context=t.get("context"),
                 toolsets=t.get("toolsets") or toolsets,
-                model=creds["model"],
+                model=effective_model,
                 max_iterations=effective_max_iter,
                 task_count=n_tasks,
                 parent_agent=parent_agent,
@@ -2066,7 +2093,8 @@ def delegate_task(
     if n_tasks == 1:
         # Single task -- run directly (no thread pool overhead)
         _i, _t, child = children[0]
-        result = _run_single_child(0, _t["goal"], child, parent_agent)
+        result = _run_single_child(0, _t["goal"], child, parent_agent,
+                                   child_timeout_seconds=child_timeout_seconds)
         results.append(result)
     else:
         # Batch -- run in parallel with per-task progress lines
@@ -2082,6 +2110,7 @@ def delegate_task(
                     goal=t["goal"],
                     child=child,
                     parent_agent=parent_agent,
+                    child_timeout_seconds=child_timeout_seconds,
                 )
                 futures[future] = i
 
@@ -2558,6 +2587,10 @@ DELEGATE_TASK_SCHEMA = {
                             "enum": ["leaf", "orchestrator"],
                             "description": "Per-task role override. See top-level 'role' for semantics.",
                         },
+                        "model": {
+                            "type": "string",
+                            "description": "Per-task model override (e.g. 'qwen-3.7-max' for an orchestrator, 'kimi-k3' for a coder). Overrides the top-level 'model' for this task only. Must be a model served by the delegation provider (or the parent's) — e.g. any route on the LiteLLM proxy. See top-level 'model'.",
+                        },
                     },
                     "required": ["goal"],
                 },
@@ -2581,6 +2614,31 @@ DELEGATE_TASK_SCHEMA = {
                     "(treated as 'leaf') when the child would exceed "
                     "max_spawn_depth or when "
                     "delegation.orchestrator_enabled=false."
+                ),
+            },
+            "model": {
+                "type": "string",
+                "description": (
+                    "Model for the child agent(s), e.g. a role matrix like "
+                    "orchestrator='qwen-3.7-max', coder='kimi-k3'. Per-task "
+                    "'model' (in the tasks array) overrides this. When omitted, "
+                    "falls back to delegation.model from config, then to the "
+                    "parent's model. The child rides the resolved delegation "
+                    "provider (or the parent's), so the model must be served by "
+                    "that same endpoint — e.g. any model routed through the "
+                    "LiteLLM proxy. Look up the correct per-role model in "
+                    "projects/maestro/wiring.md; do not guess it."
+                ),
+            },
+            "child_timeout_seconds": {
+                "type": "number",
+                "description": (
+                    "Per-call override for the child agent's hard timeout in "
+                    "seconds. Default: reads delegation.child_timeout_seconds "
+                    "from config (600s). Use a higher value (e.g. 1800) for "
+                    "orchestrator-role spawns that need to complete a full "
+                    "design+delegate+review cycle. Minimum: 30s. When "
+                    "omitted, falls back to the config/global default."
                 ),
             },
             "acp_command": {
@@ -2623,6 +2681,8 @@ registry.register(
         acp_command=args.get("acp_command"),
         acp_args=args.get("acp_args"),
         role=args.get("role"),
+        model=args.get("model"),
+        child_timeout_seconds=args.get("child_timeout_seconds"),
         parent_agent=kw.get("parent_agent"),
     ),
     check_fn=check_delegate_requirements,
